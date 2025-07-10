@@ -122,7 +122,7 @@ export default function LecturerEquipmentPage() {
               <TableHead>Lab</TableHead>
               <TableHead>Last Maintenance</TableHead>
               <TableHead>Created</TableHead>
-              <TableHead>Actions</TableHead>
+              <TableHead>Action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

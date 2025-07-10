@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/src/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/src/components/ui/dialog"
 import DashboardLayout from "@/src/components/dashboard-layout"
+import CreateLabBooking from "@/src/components/lecturer/CreateLabBooking"
 
 const scheduleData = [
     {
@@ -112,6 +113,7 @@ export default function LecturerSchedulePage() {
         return startOfWeek
     })
     const [selectedEvent, setSelectedEvent] = useState<typeof scheduleData[0] | null>(null)
+    const [isBookingModalOpen, setIsBookingModalOpen] = useState(false)
 
     const weekDays: Date[] = (() => {
         const days: Date[] = []
@@ -311,9 +313,9 @@ export default function LecturerSchedulePage() {
                                 </div>
                             </div>
                         </div>
-                        <Button className="bg-orange-500 hover:bg-orange-600">
+                        <Button className="bg-orange-500 hover:bg-orange-600" onClick={() => setIsBookingModalOpen(true)}>
                             <Plus className="h-4 w-4 mr-2" />
-                            New Event
+                            Book Lab Schedule
                         </Button>
                     </div>
                 </div>
@@ -408,6 +410,16 @@ export default function LecturerSchedulePage() {
                         </div>
                     </DialogContent>
                 </Dialog>
+
+                {/* Booking Modal */}
+                <CreateLabBooking
+                    isOpen={isBookingModalOpen}
+                    onOpenChange={setIsBookingModalOpen}
+                    onSubmit={(booking) => {
+                        console.log("Booking submitted:", booking)
+                        setIsBookingModalOpen(false)
+                    }}
+                />
             </div>
         </DashboardLayout>
     )
