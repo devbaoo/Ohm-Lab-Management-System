@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/src/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/src/components/ui/table"
 import DashboardLayout from "@/src/components/dashboard-layout"
+import CreateNewClass from "@/src/components/head/classes/CreateNewClass"
 
 // Sample classes data
 const classesData = [
@@ -140,6 +141,7 @@ export default function LecturerClassesPage() {
     const [selectedSubject, setSelectedSubject] = useState("all")
     const [selectedStatus, setSelectedStatus] = useState("all")
     const [viewMode, setViewMode] = useState<"grid" | "table">("grid")
+    const [classes, setClasses] = useState(classesData)
 
     const filteredClasses = useMemo(() => {
         return classesData.filter((classItem) => {
@@ -151,7 +153,7 @@ export default function LecturerClassesPage() {
 
             return matchesSearch && matchesSubject && matchesStatus
         })
-    }, [searchTerm, selectedSubject, selectedStatus])
+    }, [searchTerm, selectedSubject, selectedStatus, classes])
 
     const getStatusColor = (status: string) => {
         switch (status) {
@@ -189,6 +191,10 @@ export default function LecturerClassesPage() {
                 return "outline";
         }
     };
+
+    const handleCreateClass = (newClass: any) => {
+        setClasses((prev) => [...prev, newClass])
+    }
 
     const renderGridView = () => (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -316,6 +322,7 @@ export default function LecturerClassesPage() {
                         <div>
                             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">My Classes</h1>
                         </div>
+                        <CreateNewClass onCreateClass={handleCreateClass} />
                     </div>
                 </div>
 
