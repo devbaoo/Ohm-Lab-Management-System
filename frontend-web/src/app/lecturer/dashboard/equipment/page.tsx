@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Wrench, Search, Package, Calendar, Plus, Eye, Edit, Trash2 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/src/components/ui/card"
 import { Button } from "@/src/components/ui/button"
@@ -9,101 +9,143 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/src/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/src/components/ui/table"
 import DashboardLayout from "@/src/components/dashboard-layout"
+import { searchEquipment, EquipmentItem, EquipmentSearchResponse } from "@/src/services/equipmentServices"
+import { useClientOnly } from "@/src/hooks/useClientOnly"
+import CreateEquipment from "@/src/components/lecturer/CreateEquipment"
+import EquipmentDetail from "@/src/components/lecturer/EquipmentDetail"
+import EditEquipment from "@/src/components/lecturer/EditEquipment"
+import DeleteEquipment from "@/src/components/lecturer/DeleteEquipment"
 
-// Sample equipment data
-const equipmentData = [
-  {
-    id: 1,
-    name: "Oscilloscope",
-    type: "Measurement",
-    status: "available",
-    lab: "Lab A-301",
-    quantity: 5,
-    lastMaintenance: "2024-10-01",
-    createdDate: "2023-05-10",
-  },
-  {
-    id: 2,
-    name: "Soldering Station",
-    type: "Tool",
-    status: "in-use",
-    lab: "Lab B-205",
-    quantity: 3,
-    lastMaintenance: "2024-09-15",
-    createdDate: "2023-06-12",
-  },
-  {
-    id: 3,
-    name: "Multimeter",
-    type: "Measurement",
-    status: "available",
-    lab: "Lab C-102",
-    quantity: 10,
-    lastMaintenance: "2024-08-20",
-    createdDate: "2023-07-01",
-  },
-  {
-    id: 4,
-    name: "Breadboard",
-    type: "Component",
-    status: "in-use",
-    lab: "Lab A-302",
-    quantity: 20,
-    lastMaintenance: "2024-07-10",
-    createdDate: "2023-08-05",
-  },
-  {
-    id: 5,
-    name: "Power Supply",
-    type: "Power",
-    status: "maintenance",
-    lab: "Lab D-101",
-    quantity: 4,
-    lastMaintenance: "2024-11-01",
-    createdDate: "2023-09-15",
-  },
-]
-
-const equipmentTypes = [
-  { value: "all", label: "All Types" },
-  { value: "Measurement", label: "Measurement" },
-  { value: "Tool", label: "Tool" },
-  { value: "Component", label: "Component" },
-  { value: "Power", label: "Power" },
-]
+// Default API parameters as requested
+const DEFAULT_SEARCH_PARAMS = {
+  keyWord: "",
+  pageNum: 1,
+  pageSize: 10,
+  status: ""
+}
 
 const statusOptions = [
   { value: "all", label: "All Status" },
-  { value: "available", label: "Available" },
-  { value: "in-use", label: "In Use" },
-  { value: "maintenance", label: "Maintenance" },
+  { value: "Available", label: "Available" },
+  { value: "In-Use", label: "In Use" },
+  { value: "Maintenance", label: "Maintenance" },
+  { value: "Delete", label: "Deleted" },
 ]
 
 export default function LecturerEquipmentPage() {
   const [searchTerm, setSearchTerm] = useState("")
-  const [selectedType, setSelectedType] = useState("all")
   const [selectedStatus, setSelectedStatus] = useState("all")
+  const [equipmentData, setEquipmentData] = useState<EquipmentItem[]>([])
+  const [pageInfo, setPageInfo] = useState({
+    page: 1,
+    size: 10,
+    totalPage: 1,
+    totalItem: 0
+  })
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [selectedEquipmentId, setSelectedEquipmentId] = useState<string | null>(null)
+  const hasMounted = useClientOnly()
 
-  const filteredEquipment = useMemo(() => {
-    return equipmentData.filter((equipment) => {
-      const matchesSearch =
-        equipment.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        equipment.lab.toLowerCase().includes(searchTerm.toLowerCase())
-      const matchesType = selectedType === "all" || equipment.type === selectedType
-      const matchesStatus = selectedStatus === "all" || equipment.status === selectedStatus
+  const fetchEquipment = async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
 
-      return matchesSearch && matchesType && matchesStatus
-    })
-  }, [searchTerm, selectedType, selectedStatus])
+      // Use default parameters with current values
+      const searchParams = {
+        keyWord: searchTerm || DEFAULT_SEARCH_PARAMS.keyWord,
+        pageNum: pageInfo.page || DEFAULT_SEARCH_PARAMS.pageNum,
+        pageSize: pageInfo.size || DEFAULT_SEARCH_PARAMS.pageSize,
+        status: selectedStatus === "all" ? DEFAULT_SEARCH_PARAMS.status : selectedStatus
+      }
+
+      console.log('API Request Parameters:', searchParams)
+      const response = await searchEquipment(searchParams)
+
+      if (response && response.data) {
+        setEquipmentData(response.data.pageData)
+        setPageInfo(response.data.pageInfo)
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to fetch equipment")
+      console.error("Error fetching equipment:", err)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (hasMounted) {
+      fetchEquipment()
+    }
+  }, [pageInfo.page, pageInfo.size, hasMounted])
+
+  const handleSearch = () => {
+    if (hasMounted) {
+      setPageInfo(prev => ({ ...prev, page: DEFAULT_SEARCH_PARAMS.pageNum })) // Reset to page 1 when searching
+      fetchEquipment()
+    }
+  }
+
+  const handleCreateSuccess = () => {
+    fetchEquipment() // Refresh the list after successful creation
+  }
+
+  const handleViewDetail = (equipmentId: string) => {
+    setSelectedEquipmentId(equipmentId)
+    setIsDetailModalOpen(true)
+  }
+
+  const handleCloseDetail = () => {
+    setIsDetailModalOpen(false)
+    setSelectedEquipmentId(null)
+  }
+
+  const handleEditEquipment = (equipmentId: string) => {
+    setSelectedEquipmentId(equipmentId)
+    setIsEditModalOpen(true)
+  }
+
+  const handleCloseEdit = () => {
+    setIsEditModalOpen(false)
+    setSelectedEquipmentId(null)
+  }
+
+  const handleEditSuccess = () => {
+    fetchEquipment() // Refresh the list after successful update
+  }
+
+  const handleDeleteEquipment = (equipmentId: string) => {
+    setSelectedEquipmentId(equipmentId)
+    setIsDeleteModalOpen(true)
+  }
+
+  const handleCloseDelete = () => {
+    setIsDeleteModalOpen(false)
+    setSelectedEquipmentId(null)
+  }
+
+  const handleDeleteSuccess = () => {
+    fetchEquipment() // Refresh the list after successful deletion
+  }
+
+  const filteredEquipment = equipmentData
 
   const getStatusVariant = (status: string) => {
     switch (status) {
-      case "available":
+      case "Available":
         return "default"
-      case "in-use":
+      case "In-Use":
         return "secondary"
-      case "maintenance":
+      case "Maintenance":
         return "outline"
+      case "Delete":
+        return "destructive"
       default:
         return "outline"
     }
@@ -116,54 +158,108 @@ export default function LecturerEquipmentPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Quantity</TableHead>
+              <TableHead>Code</TableHead>
+              <TableHead>Serial Number</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Lab</TableHead>
-              <TableHead>Last Maintenance</TableHead>
-              <TableHead>Created</TableHead>
+              <TableHead>Description</TableHead>
+              <TableHead>QR Code</TableHead>
               <TableHead>Action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredEquipment.map((equipment) => (
-              <TableRow key={equipment.id}>
-                <TableCell className="font-medium">{equipment.name}</TableCell>
-                <TableCell className="text-orange-500">{equipment.type}</TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-1">
-                    <Package className="h-3 w-3 text-gray-500" />
-                    {equipment.quantity}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Badge variant={getStatusVariant(equipment.status)}>{equipment.status}</Badge>
-                </TableCell>
-                <TableCell>{equipment.lab}</TableCell>
-                <TableCell>
-                  {new Date(equipment.lastMaintenance).toLocaleDateString("vi-VN")}
-                </TableCell>
-                <TableCell>{new Date(equipment.createdDate).toLocaleDateString("vi-VN")}</TableCell>
-                <TableCell>
-                  <div className="flex gap-1">
-                    <Button size="sm" variant="ghost">
-                      <Eye className="h-3 w-3" />
-                    </Button>
-                    <Button size="sm" variant="ghost">
-                      <Edit className="h-3 w-3" />
-                    </Button>
-                    <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700">
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-4">
+                  Loading...
                 </TableCell>
               </TableRow>
-            ))}
+            ) : error ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-4 text-red-500">
+                  Error: {error}
+                </TableCell>
+              </TableRow>
+            ) : filteredEquipment.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-4">
+                  No equipment found
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredEquipment.map((equipment) => (
+                <TableRow key={equipment.equipmentId}>
+                  <TableCell className="font-medium">
+                    <button
+                      onClick={() => handleViewDetail(equipment.equipmentId)}
+                      className="text-left hover:text-orange-600 hover:underline transition-colors"
+                    >
+                      {equipment.equipmentName}
+                    </button>
+                  </TableCell>
+                  <TableCell className="text-orange-500">{equipment.equipmentCode}</TableCell>
+                  <TableCell>{equipment.equipmentNumberSerial}</TableCell>
+                  <TableCell>
+                    <Badge variant={getStatusVariant(equipment.equipmentStatus)}>{equipment.equipmentStatus}</Badge>
+                  </TableCell>
+                  <TableCell className="max-w-xs truncate" title={equipment.equipmentDescription}>
+                    {equipment.equipmentDescription}
+                  </TableCell>
+                  <TableCell>
+                    {equipment.equipmentQr && equipment.equipmentQr !== "null" ? (
+                      <span className="text-green-600">✓</span>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleViewDetail(equipment.equipmentId)}
+                        title="View Details"
+                      >
+                        <Eye className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleEditEquipment(equipment.equipmentId)}
+                        title="Edit"
+                      >
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-red-600 hover:text-red-700"
+                        onClick={() => handleDeleteEquipment(equipment.equipmentId)}
+                        title="Delete"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </CardContent>
     </Card>
   )
+
+  if (!hasMounted) {
+    return (
+      <DashboardLayout role="lecturer">
+        <div className="min-h-screen p-4">
+          <div className="flex justify-center items-center h-64">
+            <div className="text-lg">Loading...</div>
+          </div>
+        </div>
+      </DashboardLayout>
+    )
+  }
 
   return (
     <DashboardLayout role="lecturer">
@@ -174,7 +270,10 @@ export default function LecturerEquipmentPage() {
             <div>
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Lab Equipment</h1>
             </div>
-            <Button className="bg-orange-500 hover:bg-orange-600">
+            <Button
+              className="bg-orange-500 hover:bg-orange-600"
+              onClick={() => setIsCreateModalOpen(true)}
+            >
               <Plus className="h-4 w-4 mr-2" />
               Add Equipment
             </Button>
@@ -192,7 +291,7 @@ export default function LecturerEquipmentPage() {
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Total Equipment</p>
                   <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {equipmentData.length}
+                    {pageInfo.totalItem}
                   </p>
                 </div>
               </div>
@@ -208,7 +307,7 @@ export default function LecturerEquipmentPage() {
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Available Equipment</p>
                   <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {equipmentData.filter((e) => e.status === "available").length}
+                    {equipmentData.filter((e) => e.equipmentStatus === "Available").length}
                   </p>
                 </div>
               </div>
@@ -222,9 +321,9 @@ export default function LecturerEquipmentPage() {
                   <Package className="h-5 w-5 text-blue-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Total Units</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Current Page Items</p>
                   <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {equipmentData.reduce((sum, e) => sum + e.quantity, 0)}
+                    {equipmentData.length}
                   </p>
                 </div>
               </div>
@@ -240,7 +339,7 @@ export default function LecturerEquipmentPage() {
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Under Maintenance</p>
                   <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {equipmentData.filter((e) => e.status === "maintenance").length}
+                    {equipmentData.filter((e) => e.equipmentStatus === "Maintenance").length}
                   </p>
                 </div>
               </div>
@@ -254,25 +353,13 @@ export default function LecturerEquipmentPage() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Search by equipment name or lab..."
+                placeholder="Search by equipment name, code, or serial number..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
+                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
               />
             </div>
-
-            <Select value={selectedType} onValueChange={setSelectedType}>
-              <SelectTrigger className="w-64">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {equipmentTypes.map((type) => (
-                  <SelectItem key={type.value} value={type.value}>
-                    {type.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
 
             <Select value={selectedStatus} onValueChange={setSelectedStatus}>
               <SelectTrigger className="w-40">
@@ -286,18 +373,22 @@ export default function LecturerEquipmentPage() {
                 ))}
               </SelectContent>
             </Select>
+
+            <Button onClick={handleSearch} disabled={isLoading}>
+              Search
+            </Button>
           </div>
         </div>
 
         {/* Results */}
-        <div className="mb-4">
+        <div className="mb-4 space-y-2">
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Showing {filteredEquipment.length} of {equipmentData.length} equipment
+            Showing {filteredEquipment.length} of {pageInfo.totalItem} equipment (Page {pageInfo.page} of {pageInfo.totalPage})
           </p>
         </div>
 
         {/* Equipment Display */}
-        {filteredEquipment.length === 0 ? (
+        {filteredEquipment.length === 0 && !isLoading ? (
           <Card>
             <CardContent className="p-8 text-center">
               <Wrench className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -310,8 +401,81 @@ export default function LecturerEquipmentPage() {
             </CardContent>
           </Card>
         ) : (
-          renderTableView()
+          <>
+            {renderTableView()}
+
+            {/* Pagination */}
+            {pageInfo.totalPage > 1 && (
+              <div className="flex justify-center mt-6">
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setPageInfo(prev => ({ ...prev, page: Math.max(DEFAULT_SEARCH_PARAMS.pageNum, prev.page - 1) }))}
+                    disabled={pageInfo.page <= DEFAULT_SEARCH_PARAMS.pageNum || isLoading}
+                  >
+                    Previous
+                  </Button>
+
+                  <div className="flex items-center gap-2">
+                    {Array.from({ length: Math.min(5, pageInfo.totalPage) }, (_, i) => {
+                      const pageNum = i + DEFAULT_SEARCH_PARAMS.pageNum; // Start from 1
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={pageInfo.page === pageNum ? "default" : "outline"}
+                          onClick={() => setPageInfo(prev => ({ ...prev, page: pageNum }))}
+                          disabled={isLoading}
+                        >
+                          {pageNum}
+                        </Button>
+                      );
+                    })}
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    onClick={() => setPageInfo(prev => ({ ...prev, page: Math.min(prev.totalPage, prev.page + 1) }))}
+                    disabled={pageInfo.page >= pageInfo.totalPage || isLoading}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
         )}
+
+        {/* Create Equipment Modal */}
+        <CreateEquipment
+          isOpen={isCreateModalOpen}
+          onClose={() => setIsCreateModalOpen(false)}
+          onSuccess={handleCreateSuccess}
+        />
+
+        {/* Equipment Detail Modal */}
+        <EquipmentDetail
+          equipmentId={selectedEquipmentId}
+          isOpen={isDetailModalOpen}
+          onClose={handleCloseDetail}
+          onEdit={handleEditEquipment}
+          onDelete={handleDeleteEquipment}
+        />
+
+        {/* Edit Equipment Modal */}
+        <EditEquipment
+          equipmentId={selectedEquipmentId}
+          isOpen={isEditModalOpen}
+          onClose={handleCloseEdit}
+          onSuccess={handleEditSuccess}
+        />
+
+        {/* Delete Equipment Modal */}
+        <DeleteEquipment
+          equipmentId={selectedEquipmentId}
+          isOpen={isDeleteModalOpen}
+          onClose={handleCloseDelete}
+          onSuccess={handleDeleteSuccess}
+        />
       </div>
     </DashboardLayout>
   )

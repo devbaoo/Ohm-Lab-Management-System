@@ -107,6 +107,21 @@ const handleErrorByNotification = (errors: AxiosError<ErrorResponse>) => {
         }
     }
 
+    // Kiểm tra lỗi 401 - Unauthorized
+    if (errors.response?.status === 401) {
+        notification.error({
+            message: "Authentication Error",
+            description: "Please login to access this feature",
+            duration: 5,
+        });
+        // Redirect to login page if needed
+        if (typeof window !== 'undefined') {
+            localStorage.removeItem('token');
+            window.location.href = '/';
+        }
+        return Promise.reject(data?.errors ?? { message });
+    }
+
     // Kiểm tra nếu message là "Cart null!" hoặc lỗi 404 thì không hiển thị thông báo
     if (message === "Request failed with status code 404") {
         return Promise.reject(data?.errors ?? { message });
