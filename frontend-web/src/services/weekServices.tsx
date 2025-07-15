@@ -1,7 +1,16 @@
 import { defaultAxiosInstance, axiosWithoutLoading } from "./axios.config";
 import { toast } from "react-toastify";
 
-export const createWeek = async (data: any) => {
+export interface WeekCreateUpdate {
+    semesterId: number;
+    weeksName: string;
+    weeksStartDate: string;
+    weeksEndDate: string;
+    weeksDescription?: string;
+    weeksStatus: string;
+}
+
+export const createWeek = async (data: WeekCreateUpdate) => {
     const response = await defaultAxiosInstance.post("/api/week", data);
     toast.success("Week created successfully");
     return response.data;
@@ -17,7 +26,7 @@ export const getWeekById = async (id: string) => {
     return response.data;
 };
 
-export const updateWeek = async (id: string, data: any) => {
+export const updateWeek = async (id: string, data: WeekCreateUpdate) => {
     const response = await defaultAxiosInstance.put(`/api/week/${id}`, data);
     toast.success("Week updated successfully");
     return response.data;
