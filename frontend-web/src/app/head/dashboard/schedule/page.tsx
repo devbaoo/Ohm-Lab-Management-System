@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { CalendarDays, Clock, Plus, Users, CheckCircle2, XCircle, Edit, Trash2, Calendar } from "lucide-react"
+import { CalendarDays, Clock, Plus, Users, CheckCircle2, XCircle, Calendar } from "lucide-react"
 import DashboardLayout from "@/src/components/dashboard-layout"
 import { Button } from "@/src/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/src/components/ui/tabs"
@@ -30,8 +30,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/src/components/ui/alert-dialog"
-import { createSemester, getSemesters, updateSemester, deleteSemester, SemesterCreateUpdate } from "@/src/services/semesterServices"
-import { createWeek, getWeeksBySemester, updateWeek, deleteWeek, WeekCreateUpdate } from "@/src/services/weekServices"
+import { getSemesters } from "@/src/services/semesterServices"
+import { getWeeksBySemester } from "@/src/services/weekServices"
+import CreateSemester from "@/src/components/head/semesters/CreateSemester"
+import EditSemester from "@/src/components/head/semesters/EditSemester"
+import DeleteSemester from "@/src/components/head/semesters/DeleteSemester"
+import CreateWeek from "@/src/components/head/weeks/CreateWeek"
+import EditWeek from "@/src/components/head/weeks/EditWeek"
+import DeleteWeek from "@/src/components/head/weeks/DeleteWeek"
 
 interface Semester {
   id: number
@@ -49,46 +55,21 @@ interface Week {
   startDate: string
   endDate: string
   description?: string
+  status?: string
 }
 
 export default function SchedulePage() {
   const [date, setDate] = useState<Date | undefined>(new Date())
-  const [showNewSessionDialog, setShowNewSessionDialog] = useState(false)
-  const [showNewSemesterDialog, setShowNewSemesterDialog] = useState(false)
-  const [showNewWeekDialog, setShowNewWeekDialog] = useState(false)
-  const [showEditSemesterDialog, setShowEditSemesterDialog] = useState(false)
-  const [showEditWeekDialog, setShowEditWeekDialog] = useState(false)
-  const [showDeleteSemesterDialog, setShowDeleteSemesterDialog] = useState(false)
-  const [showDeleteWeekDialog, setShowDeleteWeekDialog] = useState(false)
-  const [selectedSemester, setSelectedSemester] = useState<Semester | null>(null)
-  const [selectedWeek, setSelectedWeek] = useState<Week | null>(null)
 
   // Replace mock data with API state
   const [semesters, setSemesters] = useState<Semester[]>([])
   const [semesterLoading, setSemesterLoading] = useState(false)
   const [semesterError, setSemesterError] = useState<string | null>(null)
-  // Form state for create/edit
-  const [semesterForm, setSemesterForm] = useState<SemesterCreateUpdate>({
-    semesterName: "",
-    semesterStartDate: "",
-    semesterEndDate: "",
-    semesterDescription: "",
-    semesterStatus: "upcoming"
-  })
 
   // State cho week
   const [weeks, setWeeks] = useState<Week[]>([])
   const [weekLoading, setWeekLoading] = useState(false)
   const [weekError, setWeekError] = useState<string | null>(null)
-  const [weekForm, setWeekForm] = useState<WeekCreateUpdate>({
-    semesterId: 0,
-    weeksName: "",
-    weeksStartDate: "",
-    weeksEndDate: "",
-    weeksDescription: "",
-    weeksStatus: "Active"
-  })
-  const [weekDateError, setWeekDateError] = useState("")
 
   // State for selected semester in Weeks tab
   const [selectedSemesterId, setSelectedSemesterId] = useState<number | null>(null);
@@ -160,6 +141,7 @@ export default function SchedulePage() {
             startDate: w.weeksStartDate,
             endDate: w.weeksEndDate,
             description: w.weeksDescription,
+            status: w.weeksStatus,
           }))
         );
       }
@@ -192,6 +174,7 @@ export default function SchedulePage() {
         startDate: w.weeksStartDate,
         endDate: w.weeksEndDate,
         description: w.weeksDescription,
+        status: w.weeksStatus,
       }));
       setWeeks(mappedWeeks);
     } catch (err: any) {
@@ -223,12 +206,7 @@ export default function SchedulePage() {
     }
   }, [selectedSemesterId, fetchWeeksForSemester]);
 
-  // Khi mở dialog tạo week, luôn set weekForm.semesterId = selectedSemesterId
-  useEffect(() => {
-    if (showNewWeekDialog && selectedSemesterId) {
-      setWeekForm((prev) => ({ ...prev, semesterId: selectedSemesterId }));
-    }
-  }, [showNewWeekDialog, selectedSemesterId]);
+
 
   // Add state to store formatted date for client-only rendering
   const [formattedDate, setFormattedDate] = useState<string>("");
@@ -247,200 +225,34 @@ export default function SchedulePage() {
     }
   }, [date]);
 
-  // Validate date logic before create/update
-  function validateSemesterDates(start: string, end: string): string {
-    if (!start || !end) return "Start date and end date are required.";
-    const startDate = new Date(start);
-    const endDate = new Date(end);
-    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return "Invalid date format.";
-    if (startDate >= endDate) return "Start date must be before end date.";
-    return "";
+  // Callback functions for components
+  const handleSemesterCreated = () => {
+    fetchSemesters()
   }
 
-  // Create semester handler
-  const handleCreateSemester = async () => {
-    setSemesterLoading(true)
-    setSemesterError(null)
-    setDateError("");
-    const err = validateSemesterDates(semesterForm.semesterStartDate, semesterForm.semesterEndDate);
-    if (err) {
-      setDateError(err);
-      setSemesterLoading(false);
-      return;
-    }
-    try {
-      await createSemester(semesterForm)
-      setShowNewSemesterDialog(false)
-      setSemesterForm({
-        semesterName: "",
-        semesterStartDate: "",
-        semesterEndDate: "",
-        semesterDescription: "",
-        semesterStatus: "upcoming"
-      })
-      fetchSemesters()
-    } catch (err: any) {
-      setSemesterError(err.response?.data?.message || err.message || "Failed to create semester")
-    } finally {
-      setSemesterLoading(false)
+  const handleSemesterUpdated = () => {
+    fetchSemesters()
+  }
+
+  const handleSemesterDeleted = () => {
+    fetchSemesters()
+  }
+
+  const handleWeekCreated = () => {
+    if (selectedSemesterId) {
+      fetchWeeksForSemester(selectedSemesterId)
     }
   }
 
-  // Edit semester dialog open handler
-  const handleEditSemester = (semester: Semester) => {
-    setSelectedSemester(semester)
-    setSemesterForm({
-      semesterName: semester.name,
-      semesterStartDate: semester.startDate,
-      semesterEndDate: semester.endDate,
-      semesterDescription: semester.description || "",
-      semesterStatus: semester.status
-    })
-    setShowEditSemesterDialog(true)
-  }
-
-  // Update semester handler
-  const handleUpdateSemester = async () => {
-    if (!selectedSemester) return
-    setSemesterLoading(true)
-    setSemesterError(null)
-    setDateError("");
-    const err = validateSemesterDates(semesterForm.semesterStartDate, semesterForm.semesterEndDate);
-    if (err) {
-      setDateError(err);
-      setSemesterLoading(false);
-      return;
-    }
-    try {
-      await updateSemester(selectedSemester.id.toString(), semesterForm)
-      setShowEditSemesterDialog(false)
-      setSelectedSemester(null)
-      fetchSemesters()
-    } catch (err: any) {
-      setSemesterError(err.response?.data?.message || err.message || "Failed to update semester")
-    } finally {
-      setSemesterLoading(false)
+  const handleWeekUpdated = () => {
+    if (selectedSemesterId) {
+      fetchWeeksForSemester(selectedSemesterId)
     }
   }
 
-  // Delete semester handler
-  const confirmDeleteSemester = async () => {
-    if (selectedSemester) {
-      setSemesterLoading(true)
-      setSemesterError(null)
-      try {
-        await deleteSemester(selectedSemester.id.toString())
-        setShowDeleteSemesterDialog(false)
-        setSelectedSemester(null)
-        fetchSemesters()
-      } catch (err: any) {
-        setSemesterError(err.response?.data?.message || err.message || "Failed to delete semester")
-      } finally {
-        setSemesterLoading(false)
-      }
-    }
-  }
-
-  // Validation ngày cho week
-  function validateWeekDates(start: string, end: string): string {
-    if (!start || !end) return "Start date and end date are required."
-    const startDate = new Date(start)
-    const endDate = new Date(end)
-    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return "Invalid date format."
-    if (startDate >= endDate) return "Start date must be before end date."
-    return ""
-  }
-
-  // Tạo week
-  const handleCreateWeek = async () => {
-    setWeekLoading(true)
-    setWeekError(null)
-    setWeekDateError("")
-    const err = validateWeekDates(weekForm.weeksStartDate, weekForm.weeksEndDate)
-    if (err) {
-      setWeekDateError(err)
-      setWeekLoading(false)
-      return
-    }
-    try {
-      await createWeek(weekForm)
-      setShowNewWeekDialog(false)
-      setWeekForm({
-        semesterId: 0,
-        weeksName: "",
-        weeksStartDate: "",
-        weeksEndDate: "",
-        weeksDescription: "",
-        weeksStatus: "Active"
-      })
-      fetchAllWeeks() // Fetch all weeks after creating a new one
-    } catch (err: any) {
-      setWeekError(err.response?.data?.message || err.message || "Failed to create week")
-    } finally {
-      setWeekLoading(false)
-    }
-  }
-
-  // Sửa week
-  const handleEditWeek = (week: Week) => {
-    setSelectedWeek(week)
-    setWeekForm({
-      semesterId: week.semesterId,
-      weeksName: typeof week.weekNumber === 'string' ? week.weekNumber : `${week.weekNumber}`,
-      weeksStartDate: toInputDateValue(week.startDate),
-      weeksEndDate: toInputDateValue(week.endDate),
-      weeksDescription: week.description || "",
-      weeksStatus: "Active"
-    })
-    setShowEditWeekDialog(true)
-  }
-  const handleUpdateWeek = async () => {
-    if (!selectedWeek) return
-    setWeekLoading(true)
-    setWeekError(null)
-    setWeekDateError("")
-    const err = validateWeekDates(weekForm.weeksStartDate, weekForm.weeksEndDate)
-    if (err) {
-      setWeekDateError(err)
-      setWeekLoading(false)
-      return
-    }
-    try {
-      await updateWeek(selectedWeek.id.toString(), {
-        semesterId: weekForm.semesterId,
-        weeksName: weekForm.weeksName,
-        weeksStartDate: weekForm.weeksStartDate,
-        weeksEndDate: weekForm.weeksEndDate,
-        weeksDescription: weekForm.weeksDescription,
-        weeksStatus: weekForm.weeksStatus,
-      })
-      setShowEditWeekDialog(false)
-      setSelectedWeek(null)
-      fetchAllWeeks() // Fetch all weeks after updating a week
-    } catch (err: any) {
-      setWeekError(err.response?.data?.message || err.message || "Failed to update week")
-    } finally {
-      setWeekLoading(false)
-    }
-  }
-  // Xoá week
-  const handleDeleteWeek = (week: Week) => {
-    setSelectedWeek(week)
-    setShowDeleteWeekDialog(true)
-  }
-  const confirmDeleteWeek = async () => {
-    if (!selectedWeek) return
-    setWeekLoading(true)
-    setWeekError(null)
-    try {
-      await deleteWeek(selectedWeek.id.toString())
-      setShowDeleteWeekDialog(false)
-      setSelectedWeek(null)
-      fetchAllWeeks() // Fetch all weeks after deleting a week
-    } catch (err: any) {
-      setWeekError(err.response?.data?.message || err.message || "Failed to delete week")
-    } finally {
-      setWeekLoading(false)
+  const handleWeekDeleted = () => {
+    if (selectedSemesterId) {
+      fetchWeeksForSemester(selectedSemesterId)
     }
   }
 
@@ -472,7 +284,7 @@ export default function SchedulePage() {
             <h1 className="text-3xl font-bold tracking-tight">Lab Schedule Management</h1>
             <p className="text-muted-foreground">Manage semesters, weeks, and lab session schedules</p>
           </div>
-          <Button onClick={() => setShowNewSessionDialog(true)} className="bg-orange-500 hover:bg-orange-600">
+          <Button className="bg-orange-500 hover:bg-orange-600">
             <Plus className="mr-2 h-4 w-4" />
             New Session
           </Button>
@@ -812,10 +624,7 @@ export default function SchedulePage() {
                     <CardTitle>Semester Management</CardTitle>
                     <CardDescription>Create and manage academic semesters</CardDescription>
                   </div>
-                  <Button onClick={() => setShowNewSemesterDialog(true)} className="bg-orange-500 hover:bg-orange-600">
-                    <Plus className="mr-2 h-4 w-4" />
-                    New Semester
-                  </Button>
+                  <CreateSemester onSemesterCreated={handleSemesterCreated} />
                 </div>
               </CardHeader>
               <CardContent>
@@ -844,12 +653,20 @@ export default function SchedulePage() {
                           )}
                         </div>
                         <div className="flex gap-2">
-                          <Button size="sm" variant="outline" onClick={() => handleEditSemester(semester)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => { setSelectedSemester(semester); setShowDeleteSemesterDialog(true); }}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <EditSemester
+                            semesterId={semester.id}
+                            semesterName={semester.name}
+                            semesterStartDate={semester.startDate}
+                            semesterEndDate={semester.endDate}
+                            semesterDescription={semester.description || ""}
+                            semesterStatus={semester.status}
+                            onSemesterUpdated={handleSemesterUpdated}
+                          />
+                          <DeleteSemester
+                            semesterId={semester.id}
+                            semesterName={semester.name}
+                            onSemesterDeleted={handleSemesterDeleted}
+                          />
                         </div>
                       </div>
                     ))
@@ -868,10 +685,7 @@ export default function SchedulePage() {
                     <CardTitle>Week Management</CardTitle>
                     <CardDescription>Create and manage academic weeks within semesters</CardDescription>
                   </div>
-                  <Button onClick={() => setShowNewWeekDialog(true)} className="bg-orange-500 hover:bg-orange-600">
-                    <Plus className="mr-2 h-4 w-4" />
-                    New Week
-                  </Button>
+                  <CreateWeek onWeekCreated={handleWeekCreated} selectedSemesterId={selectedSemesterId || 0} />
                 </div>
                 {/* Select semester to filter weeks */}
                 <div className="mt-4">
@@ -918,12 +732,21 @@ export default function SchedulePage() {
                           </p>
                         </div>
                         <div className="flex gap-2">
-                          <Button size="sm" variant="outline" onClick={() => handleEditWeek(week)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => handleDeleteWeek(week)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <EditWeek
+                            weekId={week.id}
+                            semesterId={week.semesterId}
+                            weekNumber={typeof week.weekNumber === 'string' ? week.weekNumber : `${week.weekNumber}`}
+                            startDate={week.startDate}
+                            endDate={week.endDate}
+                            description={week.description || ""}
+                            status={week.status || "Active"}
+                            onWeekUpdated={handleWeekUpdated}
+                          />
+                          <DeleteWeek
+                            weekId={week.id}
+                            weekNumber={typeof week.weekNumber === 'string' ? week.weekNumber : `${week.weekNumber}`}
+                            onWeekDeleted={handleWeekDeleted}
+                          />
                         </div>
                       </div>
                     ))
@@ -935,412 +758,6 @@ export default function SchedulePage() {
         </Tabs>
       </div>
 
-      {/* New Session Dialog */}
-      <Dialog open={showNewSessionDialog} onOpenChange={setShowNewSessionDialog}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Schedule New Lab Session</DialogTitle>
-            <DialogDescription>
-              Create a new lab session for a course. The session will be pending until approved.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="course">Course</Label>
-              <Select>
-                <SelectTrigger id="course">
-                  <SelectValue placeholder="Select course" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="elec101">Electronics 101</SelectItem>
-                  <SelectItem value="digsys">Digital Systems</SelectItem>
-                  <SelectItem value="micro">Microcontrollers</SelectItem>
-                  <SelectItem value="circuit">Circuit Design</SelectItem>
-                  <SelectItem value="embed">Embedded Systems</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="lecturer">Lecturer</Label>
-              <Select>
-                <SelectTrigger id="lecturer">
-                  <SelectValue placeholder="Select lecturer" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="smith">Dr. Smith</SelectItem>
-                  <SelectItem value="johnson">Dr. Johnson</SelectItem>
-                  <SelectItem value="williams">Dr. Williams</SelectItem>
-                  <SelectItem value="brown">Dr. Brown</SelectItem>
-                  <SelectItem value="davis">Dr. Davis</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="date">Date</Label>
-                <Input id="date" type="date" />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="time">Time</Label>
-                <Select>
-                  <SelectTrigger id="time">
-                    <SelectValue placeholder="Select time slot" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="slot1">07:00 - 09:15</SelectItem>
-                    <SelectItem value="slot2">09:30 - 11:45</SelectItem>
-                    <SelectItem value="slot3">12:30 - 14:45</SelectItem>
-                    <SelectItem value="slot4">15:00 - 17:15</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="lab">Lab Room</Label>
-                <Select>
-                  <SelectTrigger id="lab">
-                    <SelectValue placeholder="Select lab" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="lab1">Lab 1</SelectItem>
-                    <SelectItem value="lab2">Lab 2</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="students">Number of Students</Label>
-                <Input id="students" type="number" min="1" />
-              </div>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="notes">Additional Notes</Label>
-              <Input id="notes" placeholder="Any special requirements or notes" />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNewSessionDialog(false)}>
-              Cancel
-            </Button>
-            <Button className="bg-orange-500 hover:bg-orange-600" onClick={() => setShowNewSessionDialog(false)}>
-              Schedule Session
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* New Semester Dialog */}
-      <Dialog open={showNewSemesterDialog} onOpenChange={setShowNewSemesterDialog}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Create New Semester</DialogTitle>
-            <DialogDescription>Add a new academic semester to the system.</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="semester-name">Semester Name</Label>
-              <Input
-                id="semester-name"
-                value={semesterForm.semesterName || ""}
-                onChange={(e) => setSemesterForm({ ...semesterForm, semesterName: e.target.value })}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="start-date">Start Date</Label>
-                <Input
-                  id="start-date"
-                  type="date"
-                  value={toInputDateValue(semesterForm.semesterStartDate)}
-                  onChange={(e) => setSemesterForm({ ...semesterForm, semesterStartDate: e.target.value })}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="end-date">End Date</Label>
-                <Input
-                  id="end-date"
-                  type="date"
-                  value={toInputDateValue(semesterForm.semesterEndDate)}
-                  onChange={(e) => setSemesterForm({ ...semesterForm, semesterEndDate: e.target.value })}
-                />
-              </div>
-            </div>
-            {dateError && <div className="text-red-500 text-sm mt-1">{dateError}</div>}
-            <div className="grid gap-2">
-              <Label htmlFor="semester-status">Status</Label>
-              <Select
-                value={semesterForm.semesterStatus || ""}
-                onValueChange={(value) => setSemesterForm({ ...semesterForm, semesterStatus: value })}
-              >
-                <SelectTrigger id="semester-status">
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="upcoming">Upcoming</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="semester-description">Description</Label>
-              <Textarea
-                id="semester-description"
-                value={semesterForm.semesterDescription || ""}
-                onChange={(e) => setSemesterForm({ ...semesterForm, semesterDescription: e.target.value })}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNewSemesterDialog(false)}>
-              Cancel
-            </Button>
-            <Button className="bg-orange-500 hover:bg-orange-600" onClick={handleCreateSemester} disabled={semesterLoading}>
-              {semesterLoading ? "Creating..." : "Create Semester"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Semester Dialog */}
-      <Dialog open={showEditSemesterDialog} onOpenChange={setShowEditSemesterDialog}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Edit Semester</DialogTitle>
-            <DialogDescription>Update semester information.</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="edit-semester-name">Semester Name</Label>
-              <Input
-                id="edit-semester-name"
-                value={semesterForm.semesterName || ""}
-                onChange={(e) => setSemesterForm({ ...semesterForm, semesterName: e.target.value })}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="edit-start-date">Start Date</Label>
-                <Input
-                  id="edit-start-date"
-                  type="date"
-                  value={toInputDateValue(semesterForm.semesterStartDate)}
-                  onChange={(e) => setSemesterForm({ ...semesterForm, semesterStartDate: e.target.value })}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="edit-end-date">End Date</Label>
-                <Input
-                  id="edit-end-date"
-                  type="date"
-                  value={toInputDateValue(semesterForm.semesterEndDate)}
-                  onChange={(e) => setSemesterForm({ ...semesterForm, semesterEndDate: e.target.value })}
-                />
-              </div>
-            </div>
-            {dateError && <div className="text-red-500 text-sm mt-1">{dateError}</div>}
-            <div className="grid gap-2">
-              <Label htmlFor="edit-semester-status">Status</Label>
-              <Select
-                value={semesterForm.semesterStatus || ""}
-                onValueChange={(value) => setSemesterForm({ ...semesterForm, semesterStatus: value })}
-              >
-                <SelectTrigger id="edit-semester-status">
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="upcoming">Upcoming</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="edit-semester-description">Description</Label>
-              <Textarea
-                id="edit-semester-description"
-                value={semesterForm.semesterDescription || ""}
-                onChange={(e) => setSemesterForm({ ...semesterForm, semesterDescription: e.target.value })}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEditSemesterDialog(false)}>
-              Cancel
-            </Button>
-            <Button className="bg-orange-500 hover:bg-orange-600" onClick={handleUpdateSemester} disabled={semesterLoading}>
-              {semesterLoading ? "Updating..." : "Update Semester"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* New Week Dialog */}
-      <Dialog open={showNewWeekDialog} onOpenChange={setShowNewWeekDialog}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Create New Week</DialogTitle>
-            <DialogDescription>Add a new academic week to a semester.</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            {/* Semester select removed for create week, always use selectedSemesterId */}
-            <div className="grid gap-2">
-              <Label htmlFor="week-number">Week Number</Label>
-              <Input
-                id="week-number"
-                type="number"
-                min="1"
-                placeholder="e.g., 1"
-                value={weekForm.weeksName}
-                onChange={(e) => setWeekForm({ ...weekForm, weeksName: e.target.value })}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="week-start-date">Start Date</Label>
-                <Input
-                  id="week-start-date"
-                  type="date"
-                  value={weekForm.weeksStartDate}
-                  onChange={(e) => setWeekForm({ ...weekForm, weeksStartDate: e.target.value })}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="week-end-date">End Date</Label>
-                <Input
-                  id="week-end-date"
-                  type="date"
-                  value={weekForm.weeksEndDate}
-                  onChange={(e) => setWeekForm({ ...weekForm, weeksEndDate: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="week-status">Status</Label>
-              <Select
-                value={weekForm.weeksStatus}
-                onValueChange={(value) => setWeekForm({ ...weekForm, weeksStatus: value })}
-              >
-                <SelectTrigger id="week-status">
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Active">Active</SelectItem>
-                  <SelectItem value="Inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="week-description">Description</Label>
-              <Textarea
-                id="week-description"
-                placeholder="Optional description for the week"
-                value={weekForm.weeksDescription}
-                onChange={(e) => setWeekForm({ ...weekForm, weeksDescription: e.target.value })}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNewWeekDialog(false)}>
-              Cancel
-            </Button>
-            <Button className="bg-orange-500 hover:bg-orange-600" onClick={handleCreateWeek} disabled={weekLoading}>
-              {weekLoading ? "Creating..." : "Create Week"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Week Dialog */}
-      <Dialog open={showEditWeekDialog} onOpenChange={setShowEditWeekDialog}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Edit Week</DialogTitle>
-            <DialogDescription>Update week information.</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            {/* Semester select removed for edit week */}
-            <div className="grid gap-2">
-              <Label htmlFor="edit-week-number">Week Number</Label>
-              <Input id="edit-week-number" type="number" min="1" value={weekForm.weeksName} onChange={(e) => setWeekForm({ ...weekForm, weeksName: e.target.value })} />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="edit-week-start-date">Start Date</Label>
-                <Input id="edit-week-start-date" type="date" value={weekForm.weeksStartDate} onChange={(e) => setWeekForm({ ...weekForm, weeksStartDate: e.target.value })} />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="edit-week-end-date">End Date</Label>
-                <Input id="edit-week-end-date" type="date" value={weekForm.weeksEndDate} onChange={(e) => setWeekForm({ ...weekForm, weeksEndDate: e.target.value })} />
-              </div>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="edit-week-status">Status</Label>
-              <Select
-                value={weekForm.weeksStatus}
-                onValueChange={(value) => setWeekForm({ ...weekForm, weeksStatus: value })}
-              >
-                <SelectTrigger id="edit-week-status">
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Active">Active</SelectItem>
-                  <SelectItem value="Inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="edit-week-description">Description</Label>
-              <Textarea id="edit-week-description" value={weekForm.weeksDescription} onChange={(e) => setWeekForm({ ...weekForm, weeksDescription: e.target.value })} />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEditWeekDialog(false)}>
-              Cancel
-            </Button>
-            <Button className="bg-orange-500 hover:bg-orange-600" onClick={handleUpdateWeek} disabled={weekLoading}>
-              {weekLoading ? "Updating..." : "Update Week"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Semester Confirmation Dialog */}
-      <AlertDialog open={showDeleteSemesterDialog} onOpenChange={setShowDeleteSemesterDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Semester</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete "{selectedSemester?.name}"? This action cannot be undone and will also
-              delete all associated weeks.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeleteSemester} className="bg-red-500 hover:bg-red-600" disabled={semesterLoading}>
-              {semesterLoading ? "Deleting..." : "Delete"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Delete Week Confirmation Dialog */}
-      <AlertDialog open={showDeleteWeekDialog} onOpenChange={setShowDeleteWeekDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Week</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete "Week {selectedWeek?.weekNumber}"? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeleteWeek} className="bg-red-500 hover:bg-red-600">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </DashboardLayout>
   )
 }
